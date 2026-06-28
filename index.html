@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinic Patient Intake & Signature</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .form-container {
+            width: 100%;
+            max-width: 500px;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            box-sizing: border-box;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #1a365d;
+            text-align: center;
+            font-size: 24px;
+        }
+
+        label {
+            display: block;
+            margin: 20px 0 6px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+            background-color: #f8fafc;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3182ce;
+            background-color: #fff;
+        }
+
+        .consent-box {
+            background: #edf2f7;
+            padding: 15px;
+            font-size: 14px;
+            color: #4a5568;
+            max-height: 120px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
+
+        .signature-wrapper {
+            border: 2px dashed #cbd5e0;
+            background: #ffffff;
+            border-radius: 6px;
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 200px;
+            display: block;
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        .btn-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        #clear-btn {
+            background-color: #e2e8f0;
+            color: #4a5568;
+        }
+
+        #clear-btn:hover {
+            background-color: #cbd5e0;
+        }
+
+        button[type="submit"] {
+            background-color: #3182ce;
+            color: white;
+        }
+
+        button[type="submit"]:hover {
+            background-color: #2b6cb0;
+        }
+
+        button:disabled {
+            background-color: #cbd5e0 !important;
+            color: #718096;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="form-container">
+        <h2>Patient Declaration Form</h2>
+        
+        <form id="clinicForm">
+            <label for="patientName">Patient Full Name:</label>
+            <input type="text" id="patientName" placeholder="John Doe" required>
+
+            <label for="patientId">National ID / Iqama:</label>
+            <input type="text" id="patientId" placeholder="10xxxxxxxx" required>
+
+            <label>Medical Declaration Consent:</label>
+            <div class="consent-box" id="consentText">
+                I hereby declare that all the medical and dental history details provided in this questionnaire are true and accurate to the best of my knowledge. I understand that withholding medical information can impact my dental treatment outcomes.
+            </div>
+
+            <label>Patient Signature (Sign in the box below):</label>
+            <div class="signature-wrapper">
+                <canvas id="signature-canvas"></canvas>
+            </div>
+            
+            <div class="btn-container">
+                <button type="button" id="clear-btn">Clear</button>
+                <button type="submit" id="submit-btn">Submit & Save Form</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const canvas = document.getElementById("signature-canvas");
+            const submitBtn = document.getElementById("submit-btn");
+            const form = document.getElementById("clinicForm");
+            
+            // Initialize the canvas signature utility
+            const signaturePad = new SignaturePad(canvas, {
+                backgroundColor: 'rgb(255, 255, 255)',
+                penColor: 'rgb(0, 0, 128)' 
+            });
+
+            // Handle canvas sizing properly for retina/high-DPI screens and mobile flips
+            function resizeCanvas() {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio;
+                canvas.height = canvas.offsetHeight * ratio;
+                canvas.getContext("2d").scale(ratio, ratio);
+                signaturePad.clear(); 
+            }
+
+            window.addEventListener("resize", resizeCanvas);
+            resizeCanvas();
+
+            // Clear button listener
+            document.getElementById("clear-btn").addEventListener("click", () => {
+                signaturePad.clear();
+            });
+
+            // Form Submit Listener
+            form.addEventListener("submit", function (e) {
+                e.preventDefault();
+
+                // Validate signature presence
+                if (signaturePad.isEmpty()) {
+                    alert("Validation Error: Please sign the document before submitting.");
+                    return;
+                }
+
+                // Lock submit interface during transmission
+                submitBtn.disabled = true;
+                submitBtn.innerText = "Saving to Google Drive...";
+
+                const patientName = document.getElementById("patientName").value;
+                const patientId = document.getElementById("patientId").value;
+                const signatureImage = signaturePad.toDataURL("image/png");
+
+                // Package details into structural JSON
+                const payload = {
+                    patientName: patientName,
+                    patientId: patientId,
+                    signatureData: signatureImage
+                };
+
+                // Form target endpoint mapped to your inaya.edu.sa Apps Script
+                const googleScriptUrl = "https://script.google.com/macros/s/AKfycbyLBg9Gy4N2CAli6PUwSDgfIT9m5nKzi1m00IgG-aj1AYDFF6AOEHryuk9SoF2Jfzsn/exec";
+
+                // Post transmission configuration block
+                fetch(googleScriptUrl, {
+                    method: "POST",
+                    body: JSON.stringify(payload),
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8" // Ensures data clears strict mobile CORS security walls
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Check returned payload token state
+                    if (data && (data.status === "SUCCESS" || data.result === "success")) {
+                        alert("Success! Form saved to Google Drive. Redirecting to DenTech...");
+                        window.location.href = "https://dentech.com.sa/en/%D8%A7%D9%84%D8%B1%D8%A6%D9%8A%D8%B3%D9%8A%D8%A9-english/";
+                    } else {
+                        alert("Server Processing Error: " + (data.error || "Please check backend script configurations."));
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = "Submit & Save Form";
+                    }
+                })
+                .catch(error => {
+                    alert("Transmission error. Please check your network connection or verify deployment setup.");
+                    console.error(error);
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "Submit & Save Form";
+                });
+            });
+        });
+    </script>
+
+</body>
+</html>
